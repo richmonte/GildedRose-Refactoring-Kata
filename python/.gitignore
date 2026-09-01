@@ -4,3 +4,4 @@
 .idea/
 *.iml
 uv.lock
+.venv/
