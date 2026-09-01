@@ -171,23 +171,34 @@ def test_backstage_passes_quality_does_not_exceed_fifty_with_triple_bump():
 # ---------------------------------------------------------------------------
 # Conjured items
 #
-# The requirements say Conjured items should degrade in quality twice as
-# fast as normal items, but update_quality() has no special case for them
-# at all -- they fall through to the normal-item branch. These tests
-# characterize that *current* (spec-violating) behavior as a golden master,
-# so that fixing it later shows up as a deliberate, visible diff to these
-# tests rather than an accidental behavior change during refactoring.
+# Conjured items degrade in quality twice as fast as normal items: 2/day
+# before the sell-by date, 4/day once past it. Any item whose name starts
+# with "Conjured" gets this treatment, not just "Conjured Mana Cake" --
+# GildedRose is a supplier of a whole category of conjured goods, not one
+# fixed SKU.
 # ---------------------------------------------------------------------------
 
-def test_conjured_item_currently_degrades_at_normal_rate_before_sell_by_date():
+def test_conjured_item_quality_decreases_by_two_before_sell_by_date():
     item = update_quality(Item(CONJURED_ITEM, sell_in=3, quality=6))
-    assert item.quality == 5  # spec would require 4
+    assert item.quality == 4
     assert item.sell_in == 2
 
 
-def test_conjured_item_currently_degrades_at_normal_rate_past_sell_by_date():
+def test_conjured_item_quality_decreases_by_four_once_past_sell_by_date():
     item = update_quality(Item(CONJURED_ITEM, sell_in=-1, quality=6))
-    assert item.quality == 4  # spec would require 2
+    assert item.quality == 2
+
+
+def test_conjured_item_quality_does_not_go_negative_when_already_past_date():
+    item = update_quality(Item(CONJURED_ITEM, sell_in=-1, quality=1))
+    assert item.quality == 0
+
+
+def test_conjured_item_matching_is_by_name_prefix_not_a_fixed_sku():
+    # Any "Conjured ..." item gets the 2x degradation, not just the one
+    # SKU the fixture happens to use.
+    item = update_quality(Item("Conjured Speed Potion", sell_in=3, quality=6))
+    assert item.quality == 4
 
 
 # ---------------------------------------------------------------------------
@@ -210,4 +221,4 @@ def test_update_quality_handles_a_mixed_list_of_items_independently():
     assert (brie.quality, brie.sell_in) == (1, 1)
     assert (sulfuras.quality, sulfuras.sell_in) == (80, 0)
     assert (backstage.quality, backstage.sell_in) == (21, 14)
-    assert (conjured.quality, conjured.sell_in) == (5, 2)
+    assert (conjured.quality, conjured.sell_in) == (4, 2)

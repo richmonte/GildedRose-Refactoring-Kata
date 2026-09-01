@@ -6,16 +6,17 @@ MIN_QUALITY = 0
 AGED_BRIE = "Aged Brie"
 BACKSTAGE_PASSES = "Backstage passes to a TAFKAL80ETC concert"
 SULFURAS = "Sulfuras, Hand of Ragnaros"
+CONJURED_PREFIX = "Conjured"
+
+CONJURED_DEGRADATION_RATE = 2
 
 
-def increase_quality(item):
-    if item.quality < MAX_QUALITY:
-        item.quality += 1
+def increase_quality(item, amount=1):
+    item.quality = min(MAX_QUALITY, item.quality + amount)
 
 
-def decrease_quality(item):
-    if item.quality > MIN_QUALITY:
-        item.quality -= 1
+def decrease_quality(item, amount=1):
+    item.quality = max(MIN_QUALITY, item.quality - amount)
 
 
 class NormalItemUpdater:
@@ -59,6 +60,16 @@ class BackstagePassUpdater:
             item.quality = MIN_QUALITY
 
 
+class ConjuredItemUpdater:
+    """Degrades in quality twice as fast as a normal item."""
+
+    def update(self, item):
+        decrease_quality(item, CONJURED_DEGRADATION_RATE)
+        item.sell_in -= 1
+        if item.sell_in < 0:
+            decrease_quality(item, CONJURED_DEGRADATION_RATE)
+
+
 class GildedRose(object):
 
     _UPDATERS_BY_NAME = {
@@ -66,6 +77,7 @@ class GildedRose(object):
         BACKSTAGE_PASSES: BackstagePassUpdater(),
         SULFURAS: SulfurasUpdater(),
     }
+    _CONJURED_UPDATER = ConjuredItemUpdater()
     _DEFAULT_UPDATER = NormalItemUpdater()
 
     def __init__(self, items):
@@ -73,8 +85,15 @@ class GildedRose(object):
 
     def update_quality(self):
         for item in self.items:
-            updater = self._UPDATERS_BY_NAME.get(item.name, self._DEFAULT_UPDATER)
-            updater.update(item)
+            self._select_updater(item).update(item)
+
+    @classmethod
+    def _select_updater(cls, item):
+        if item.name in cls._UPDATERS_BY_NAME:
+            return cls._UPDATERS_BY_NAME[item.name]
+        if item.name.startswith(CONJURED_PREFIX):
+            return cls._CONJURED_UPDATER
+        return cls._DEFAULT_UPDATER
 
 
 class Item:
